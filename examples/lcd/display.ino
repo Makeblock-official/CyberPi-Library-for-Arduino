@@ -5,7 +5,6 @@ CyberPi cyber;
 void setup()
 {
     Serial.begin(115200);
-    cyber.begin_lcd();
     for(int y=0;y<128;y++)
     {
         for(int x=0;x<128;x++)

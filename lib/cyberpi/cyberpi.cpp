@@ -17,6 +17,8 @@ CyberPi::CyberPi()
     memset(_framebuffer,0,128*128*2);
     aw_init(0);
     begin_sound();
+    begin_lcd();
+    begin_gyro();
     TaskHandle_t threadTask;
     xTaskCreatePinnedToCore(CyberPi::_on_thread,"_on_thread",4096,NULL,10,&threadTask,1);
 }
