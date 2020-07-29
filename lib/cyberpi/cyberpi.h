@@ -14,6 +14,9 @@ class CyberPi
 {
     public:
         CyberPi();
+        void begin();
+        
+        void begin_gpio();
 
         void begin_lcd();
         void set_lcd_light(bool on);
@@ -23,14 +26,14 @@ class CyberPi
         void render_lcd();
 
         void set_rgb(int idx,uint8_t red,uint8_t greeen,uint8_t blue);
-
+        uint8_t get_gpio();
         int get_joystick_x();
         int get_joystick_y();
         bool get_joystick_pressed();
 
         bool get_button_a();
         bool get_button_b();
-        bool get_button_c();
+        bool get_button_menu();
 
         void begin_gyro();
         float get_gyro_x();

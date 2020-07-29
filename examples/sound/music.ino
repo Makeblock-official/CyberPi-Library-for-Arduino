@@ -1,5 +1,3 @@
-
-#include <Arduino.h>
 #include "cyberpi.h"
 CyberPi cyber;
 
@@ -10,6 +8,7 @@ int ho[7] = {72,74,76,77,79,81,83};
 void setup() 
 {
     Serial.begin(115200);
+    cyber.begin();
     for(int i=0;i<14;i++)
     {
         cyber.set_instrument(i);

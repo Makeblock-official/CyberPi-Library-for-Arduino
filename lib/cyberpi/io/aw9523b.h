@@ -54,6 +54,47 @@ typedef enum aw_gpio_num_t{
 }
 aw_gpio_num_t;
 
+#define inputPort0 0x00
+#define inputPort1 0x01
+
+#define outputPort0 0x02
+#define outputPort1 0x03
+
+#define configPort0 0x04
+#define configPort1 0x05
+
+#define AW_GPIO_MODE_INPUT  0
+#define AW_GPIO_MODE_OUTPUT 1
+
+#define REG_INPUT_P0        0x00
+#define REG_INPUT_P1        0x01
+#define REG_OUTPUT_P0       0x02
+#define REG_OUTPUT_P1       0x03
+#define REG_CONFIG_P0       0x04
+#define REG_CONFIG_P1       0x05
+#define REG_INT_P0          0x06
+#define REG_INT_P1          0x07
+#define REG_ID              0x10
+#define REG_CTRL            0x11
+#define REG_WORK_MODE_P0    0x12
+#define REG_WORK_MODE_P1    0x13
+#define REG_DIM00           0x20
+#define REG_DIM01           0x21
+#define REG_DIM02           0x22
+#define REG_DIM03           0x23
+#define REG_DIM04           0x24
+#define REG_DIM05           0x25
+#define REG_DIM06           0x26
+#define REG_DIM07           0x27
+#define REG_DIM08           0x28
+#define REG_DIM09           0x29
+#define REG_DIM10           0x2a
+#define REG_DIM11           0x2b
+#define REG_DIM12           0x2c
+#define REG_DIM13           0x2d
+#define REG_DIM14           0x2e
+#define REG_DIM15           0x2f
+#define REG_SWRST           0x7F    
 typedef enum AW9523BPortMode
 {
     MODE_OPEN_DRAIN = 0x00, // Port 0 open drain mode
@@ -66,6 +107,7 @@ AW9523BPortMode;
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 
+#define REG_DIM00           0x20
 
 void aw_init(uint8_t address);
 
@@ -90,12 +132,15 @@ uint8_t aw_read_i2c(uint8_t addr, uint8_t reg);
 int modifyBit(int currentByte, int position, int bit);
 void aw_pinMode(enum aw_gpio_num_t pin, uint8_t mode);
 void aw_digitalWrite(enum aw_gpio_num_t pin, uint8_t value);
+bool aw_digitalRead(enum aw_gpio_num_t pin);
+uint8_t aw_get_gpio();
 void aw_config_inout(enum AW9523BPort port, uint8_t inout);
 
 void aw_config_led_gpio(enum AW9523BPort port, uint8_t ledGpio);
+void aw_update_leds(uint8_t*data,uint8_t len);
 uint8_t aw_read(enum AW9523BPort port);
 
-
+void aw_write_data(int32_t port, uint8_t slaver_addr, uint8_t reg_addr, uint8_t *data, uint16_t size);
 void aw_write(enum AW9523BPort port, uint8_t data);
 
 void aw_reset(enum AW9523BPort port);

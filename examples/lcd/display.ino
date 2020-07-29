@@ -1,10 +1,10 @@
-#include <Arduino.h>
 #include "cyberpi.h"
 
 CyberPi cyber;
 void setup()
 {
     Serial.begin(115200);
+    cyber.begin();
     for(int y=0;y<128;y++)
     {
         for(int x=0;x<128;x++)
@@ -19,4 +19,8 @@ void setup()
 }
 void loop()
 { 
+    cyber.set_lcd_light(false);
+    delay(1000);
+    cyber.set_lcd_light(true);
+    delay(1000);
 }

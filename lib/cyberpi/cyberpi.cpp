@@ -9,21 +9,27 @@ extern "C" {
 }
 static MSynth _audio;
 static uint16_t *_framebuffer;
+static uint8_t*_led_data;
 static SemaphoreHandle_t _render_ready ;
 CyberPi::CyberPi()
 { 
     _render_ready = xSemaphoreCreateBinary();
     _framebuffer = (uint16_t*)this->malloc(128*128*2);
+    _led_data = this->malloc(15);
+    memset(_led_data,0,15);
     memset(_framebuffer,0,128*128*2);
-    aw_init(0);
+}
+void CyberPi::begin()
+{
+    begin_gpio();
     begin_sound();
-    begin_lcd();
     begin_gyro();
+    begin_lcd();
     TaskHandle_t threadTask;
     xTaskCreatePinnedToCore(CyberPi::_on_thread,"_on_thread",4096,NULL,10,&threadTask,1);
 }
-
-void CyberPi::_on_thread(void *p){
+void CyberPi::_on_thread(void *p)
+{
     while(true)
     {
         _audio.render();
@@ -32,6 +38,25 @@ void CyberPi::_on_thread(void *p){
             lcd_draw(_framebuffer,128,128);
         }
     }
+}
+
+#define JOYSTICK_UP_IO                      AW_P0_1                         
+#define JOYSTICK_DOWN_IO                    AW_P0_4
+#define JOYSTICK_RIGHT_IO                   AW_P0_2
+#define JOYSTICK_LEFT_IO                    AW_P0_0
+#define JOYSTICK_CENTER_IO                  AW_P0_3
+#define BUTTON_A_IO                         AW_P0_6
+#define BUTTON_B_IO                         AW_P0_5
+#define BUTTON_MENU_IO                      AW_P1_0
+
+void CyberPi::begin_gpio()
+{
+    aw_init(0);
+    aw_pinMode(JOYSTICK_UP_IO,AW_GPIO_MODE_INPUT);
+    aw_pinMode(JOYSTICK_DOWN_IO,AW_GPIO_MODE_INPUT);
+    aw_pinMode(JOYSTICK_RIGHT_IO,AW_GPIO_MODE_INPUT);
+    aw_pinMode(JOYSTICK_LEFT_IO,AW_GPIO_MODE_INPUT);
+    aw_pinMode(JOYSTICK_CENTER_IO,AW_GPIO_MODE_INPUT);
 }
 void CyberPi::begin_lcd()
 {
@@ -48,6 +73,7 @@ void CyberPi::set_lcd_light(bool on)
         lcd_off();
     }
 }
+
 void CyberPi::set_lcd_pixel(uint8_t x,uint8_t y,uint16_t color)//uint16_t*buffer,uint16_t width,uint16_t height)
 {
     _framebuffer[y*128+x] = color;
@@ -68,33 +94,55 @@ void CyberPi::render_lcd()
 
 void CyberPi::set_rgb(int idx,uint8_t red,uint8_t greeen,uint8_t blue)
 {
-    
+    _led_data[idx*3] = red;
+    _led_data[idx*3+1] = greeen;
+    _led_data[idx*3+2] = blue;
+    aw_write_data(I2C_NUM_1, 0x5B, REG_DIM00, _led_data, 15);
 }
-
+uint8_t CyberPi::get_gpio()
+{
+    return aw_get_gpio();
+}
 int CyberPi::get_joystick_x()
 {
-    
+    if(aw_digitalRead(JOYSTICK_RIGHT_IO))
+    {
+        return 1;
+    }
+    if(aw_digitalRead(JOYSTICK_LEFT_IO))
+    {
+        return -1;
+    }
+    return 0;
 }
 int CyberPi::get_joystick_y()
 {
-    
+    if(aw_digitalRead(JOYSTICK_DOWN_IO))
+    {
+        return 1;
+    }
+    if(aw_digitalRead(JOYSTICK_UP_IO))
+    {
+        return -1;
+    }
+    return 0;
 }
 bool CyberPi::get_joystick_pressed()
 {
-    
+    return aw_digitalRead(JOYSTICK_CENTER_IO);
 }
 
 bool CyberPi::get_button_a()
 {
-    
+    return aw_digitalRead(BUTTON_A_IO);
 }
 bool CyberPi::get_button_b()
 {
-    
+    return aw_digitalRead(BUTTON_B_IO);
 }
-bool CyberPi::get_button_c()
+bool CyberPi::get_button_menu()
 {
-    
+    return aw_digitalRead(BUTTON_MENU_IO);
 }
 
 void CyberPi::begin_gyro()

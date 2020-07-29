@@ -244,14 +244,14 @@ void lcd_set_bg_brightness(uint16_t percentage)
 
 void lcd_on(void)
 { 
-  aw_pinMode(lcd_info.lcd_conf.pin_num_bckl, GPIO_MODE_OUTPUT);
+  aw_pinMode(lcd_info.lcd_conf.pin_num_bckl, AW_GPIO_MODE_OUTPUT);
   aw_digitalWrite(lcd_info.lcd_conf.pin_num_bckl, (lcd_info.lcd_conf.bckl_active_level) & 0x01);
 }
 
 
 void lcd_off(void)
 { 
-  aw_pinMode(lcd_info.lcd_conf.pin_num_bckl, GPIO_MODE_OUTPUT);
+  aw_pinMode(lcd_info.lcd_conf.pin_num_bckl, AW_GPIO_MODE_OUTPUT);
   aw_digitalWrite(lcd_info.lcd_conf.pin_num_bckl, (lcd_info.lcd_conf.bckl_active_level) & 0x00);
 }
 
@@ -321,8 +321,7 @@ void lcd_config(lcd_conf_t *lcd_conf)
 	lcd_info.dc.dc_io = lcd_conf->pin_num_dc;
 	// Initialize non-SPI GPIOs
 	aw_pinMode(lcd_conf->pin_num_dc, AW_GPIO_MODE_OUTPUT);
-
-	aw_pinMode(lcd_conf->pin_num_rst, GPIO_MODE_OUTPUT);
+	aw_pinMode(lcd_conf->pin_num_rst, AW_GPIO_MODE_OUTPUT);
 	aw_digitalWrite(lcd_conf->pin_num_rst, (lcd_conf->rst_active_level) & 0x1);
 	vTaskDelay(100 / portTICK_RATE_MS);
 	aw_digitalWrite(lcd_conf->pin_num_rst, (~(lcd_conf->rst_active_level)) & 0x1);
@@ -346,7 +345,7 @@ void lcd_config(lcd_conf_t *lcd_conf)
 		cmd_id++;
 	}
 
-	aw_pinMode(lcd_conf->pin_num_bckl, GPIO_MODE_OUTPUT);
+	aw_pinMode(lcd_conf->pin_num_bckl, AW_GPIO_MODE_OUTPUT);
 	aw_digitalWrite(lcd_conf->pin_num_bckl, (lcd_conf->bckl_active_level) & 0x1);
 }
 
