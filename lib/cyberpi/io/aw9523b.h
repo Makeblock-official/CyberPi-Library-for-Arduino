@@ -101,46 +101,21 @@ typedef enum AW9523BPortMode
     MODE_PUSH_PULL = 1 << 4 // Port 0 push pull mode
 }
 AW9523BPortMode;
-#define I2C_MASTER_SCL_IO 18         /*!< gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO 19        /*!< gpio number for I2C master data  */
-#define I2C_MASTER_NUM I2C_NUM_1    /*!< I2C port number for master dev */
-#define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
-
 #define REG_DIM00           0x20
 
-void aw_init(uint8_t address);
+void aw_init();
 
-/**************************************************************************/
-/*!
-    @brief  Write a byte to an I2C register
-    @param reg Register address
-    @param val Value to write
-    @return I2C transmission result 
-*/
-/**************************************************************************/
-void aw_write_i2c(uint8_t addr, uint8_t reg, uint8_t val);
-
-/**************************************************************************/
-/*!
-    @brief  Read a byte from an I2C register
-    @param reg Register address
-    @return Register value
-*/
-/**************************************************************************/
-uint8_t aw_read_i2c(uint8_t addr, uint8_t reg);
 int modifyBit(int currentByte, int position, int bit);
 void aw_pinMode(enum aw_gpio_num_t pin, uint8_t mode);
 void aw_digitalWrite(enum aw_gpio_num_t pin, uint8_t value);
 bool aw_digitalRead(enum aw_gpio_num_t pin);
-uint8_t aw_get_gpio();
+uint16_t aw_get_gpio();
 void aw_config_inout(enum AW9523BPort port, uint8_t inout);
 
 void aw_config_led_gpio(enum AW9523BPort port, uint8_t ledGpio);
 void aw_update_leds(uint8_t*data,uint8_t len);
 uint8_t aw_read(enum AW9523BPort port);
 
-void aw_write_data(int32_t port, uint8_t slaver_addr, uint8_t reg_addr, uint8_t *data, uint16_t size);
 void aw_write(enum AW9523BPort port, uint8_t data);
 
 void aw_reset(enum AW9523BPort port);
