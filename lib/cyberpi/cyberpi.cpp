@@ -92,9 +92,16 @@ void CyberPi::set_lcd_light(bool on)
     }
 }
 
+void CyberPi::clean_lcd()
+{
+    memset(_framebuffer,0x0,128*128*2);
+}
 void CyberPi::set_lcd_pixel(uint8_t x,uint8_t y,uint16_t color)//uint16_t*buffer,uint16_t width,uint16_t height)
 {
-    _framebuffer[y*128+x] = color;
+    if(y>=0&&y<128&&x>=0&&x<128)
+    {
+        _framebuffer[y*128+x] = color;
+    }
 }
 uint16_t CyberPi::color24_to_16(uint32_t rgb)
 {
@@ -107,7 +114,11 @@ uint16_t CyberPi::swap_color(uint16_t color)
 }
 void CyberPi::render_lcd()
 {
-    xSemaphoreGive(_render_ready);
+    if(millis()-lastTime>20)
+    {
+        lastTime = millis();
+        xSemaphoreGive(_render_ready);
+    }
 }
 
 void CyberPi::set_rgb(int idx,uint8_t red,uint8_t greeen,uint8_t blue)
@@ -240,5 +251,6 @@ uint8_t* CyberPi::malloc(uint32_t len)
     {
         return (uint8_t*)MALLOC_INTERNAL(len);
     }
+    Serial.printf("spi ram!!!!!!!!!!!!!!!!\n\n\n\n");
     return (uint8_t*)MALLOC_SPI(len);
 }
