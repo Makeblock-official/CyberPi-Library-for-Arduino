@@ -8,8 +8,23 @@ extern "C"
 // #include <esp32/spiram.h>
 #include "esp_heap_caps.h"
 }
-#define MALLOC_SPI(a) (ps_malloc(a))
+#define MALLOC_SPI(a) (heap_caps_malloc((a),MALLOC_CAP_SPIRAM))
 #define MALLOC_INTERNAL(a) (heap_caps_malloc((a),MALLOC_CAP_DMA))
+
+union
+{
+  uint8_t byteVal[2];
+  int16_t shortVal;
+}val2byte;
+
+#define ROUND_X(x) ((int)(x + 0.5f))
+#ifndef MAX
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
+typedef void (*mic_callback)(int8_t*,int);
 class CyberPi
 {
     public:
@@ -56,15 +71,16 @@ class CyberPi
         // void sent_ir_data(uint8_t c);
 
         // void begin_microphone(on_record);
-
+        void on_microphone_data(void (*func)(int8_t*,int));
         uint8_t* malloc(uint32_t len);
-
     private:
         long lastTime;
         void begin_gyro();
         void begin_gpio();
         void begin_lcd();
         void begin_sound();
+        void begin_microphone();
+        static void _on_mic_thread(void* parameter);
         static void _on_thread(void *p);
         static void _render_audio(uint8_t *audio_buf,uint16_t audio_buf_len);
 };

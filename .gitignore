@@ -32,3 +32,5 @@
 *.app
 .pio
 .vscode
+src/CMakeLists.txt
+CMakeLists.txt

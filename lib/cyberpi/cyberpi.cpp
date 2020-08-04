@@ -8,12 +8,13 @@ extern "C" {
 #include "i2c/i2c.h"
 #include "gyro/gyro.h"
 #include "sound/synth.h"
+#include "microphone/es8218e.h"
 }
 static MSynth _audio;
 static uint16_t *_framebuffer;
 static uint8_t*_led_data;
 static uint8_t*_gyro_data;
-static SemaphoreHandle_t _render_ready ;
+static SemaphoreHandle_t _render_ready;
 
 CyberPi::CyberPi()
 { 
@@ -30,6 +31,7 @@ void CyberPi::begin()
     begin_gyro();
     begin_gpio();
     begin_sound();
+    begin_microphone();
     begin_gyro();
     begin_lcd();
     TaskHandle_t threadTask;
@@ -244,6 +246,70 @@ void CyberPi::_render_audio(uint8_t *audio_buf,uint16_t audio_buf_len)
   size_t bytes_written;
   i2s_write(I2S_NUM_0, audio_buf, audio_buf_len, &bytes_written, portMAX_DELAY);
 }
+mic_callback _mic_callback;
+void CyberPi::_on_mic_thread(void* parameter) {
+  size_t bytes_read = 0;
+  int mic_length = 1024;
+  int8_t *samples = (int8_t*)((CyberPi*)parameter)->malloc(1024);
+  while (true) 
+  {
+        i2s_read(I2S_NUM_1, samples, mic_length, &bytes_read, portMAX_DELAY);
+        int32_t dac_value = 0;
+        int32_t dac_value_addition = 0;
+        int32_t average_value = 0;
+        int16_t maximum_value = 0;
+        for(int i = 0; i < mic_length; i += 16)
+        {
+            val2byte.byteVal[1] = samples[i + 1];
+            val2byte.byteVal[0] = samples[i + 0];
+            dac_value = val2byte.shortVal;
+            dac_value_addition = dac_value_addition + abs(dac_value);
+            if(abs(dac_value) > maximum_value)
+            {
+                maximum_value = abs(dac_value);
+            }
+        }
+        average_value = 16 * dac_value_addition / mic_length;
+        if(_mic_callback)
+        {
+            _mic_callback(samples,mic_length);
+        }
+    }
+}
+void CyberPi::begin_microphone ()
+{
+    _mic_callback = NULL;
+    i2s_config_t i2s_config =
+    {
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_TX),
+        .sample_rate =  160000,
+        .bits_per_sample = (i2s_bits_per_sample_t)16,
+        .channel_format = (i2s_channel_fmt_t)I2S_CHANNEL_FMT_ONLY_RIGHT,
+        .communication_format = I2S_COMM_FORMAT_I2S,
+        .intr_alloc_flags = 0,
+        .dma_buf_count = 2,
+        .dma_buf_len = 1024,
+        .use_apll = true
+    };
+    i2s_driver_install(I2S_NUM_1, &i2s_config, 0, NULL);
+    i2s_pin_config_t pin_config = 
+    {
+        .bck_io_num = 13,
+        .ws_io_num = 14,
+        .data_out_num = -1,
+        .data_in_num = 35 
+    };
+    i2s_set_pin(I2S_NUM_1, &pin_config);
+    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0_CLK_OUT1);
+    es8218e_start();
+    TaskHandle_t threadTask;
+    xTaskCreatePinnedToCore(this->_on_mic_thread, "i2s_mic_read", 2048, this, 11, &threadTask, 1);
+}
+
+void CyberPi::on_microphone_data(void (*func)(int8_t*,int))
+{
+    _mic_callback = func;
+}
 
 uint8_t* CyberPi::malloc(uint32_t len)
 {
@@ -251,6 +317,5 @@ uint8_t* CyberPi::malloc(uint32_t len)
     {
         return (uint8_t*)MALLOC_INTERNAL(len);
     }
-    Serial.printf("spi ram!!!!!!!!!!!!!!!!\n\n\n\n");
     return (uint8_t*)MALLOC_SPI(len);
 }

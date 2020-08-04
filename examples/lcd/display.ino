@@ -20,7 +20,7 @@ void setup()
 void loop()
 { 
     cyber.set_lcd_light(false);
-    delay(1000);
+    delay(2000);
     cyber.set_lcd_light(true);
-    delay(1000);
+    delay(2000);
 }
