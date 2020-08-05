@@ -95,7 +95,6 @@ class MSynth
     }
     void setInstrument(uint8_t instrumentId)
     {
-      
         _instrumentId = instrumentId>14?14:(instrumentId<0?0:instrumentId);
     }
     void setVolume(unsigned char voice,uint8_t vol)

@@ -15,40 +15,41 @@ static uint16_t *_framebuffer;
 static uint8_t*_led_data;
 static uint8_t*_gyro_data;
 static SemaphoreHandle_t _render_ready;
-
+static bool sound_enabled = false;
+static bool microphone_enabled = false;
+data_callback _mic_callback;
+data_callback _sound_callback;
+static long prev_time = 0;
+static int _loudness;
 CyberPi::CyberPi()
 { 
     _render_ready = xSemaphoreCreateBinary();
-    _framebuffer = (uint16_t*)this->malloc(128*128*2);
     _led_data = this->malloc(15);
     _gyro_data = this->malloc(14);
+    
     memset(_led_data,0,15);
-    memset(_framebuffer,0,128*128*2);
 }
 void CyberPi::begin()
 {
     i2c_init();
-    begin_gyro();
+    aw_init();
     begin_gpio();
+    begin_lcd();
+    begin_gyro();
     begin_sound();
     begin_microphone();
-    begin_gyro();
-    begin_lcd();
-    TaskHandle_t threadTask;
-    xTaskCreatePinnedToCore(CyberPi::_on_thread,"_on_thread",4096,NULL,10,&threadTask,1);
+
+    TaskHandle_t threadTask_lcd;
+    xTaskCreatePinnedToCore(this->_on_lcd_thread,"_on_lcd_thread",4096,NULL,10,&threadTask_lcd,1);
+    TaskHandle_t threadTask_sensor;
+    xTaskCreatePinnedToCore(this->_on_sensor_thread, "on_sensor_read", 10000, this, 8, &threadTask_sensor, 1);
+    TaskHandle_t threadTask_sound;
+    xTaskCreatePinnedToCore(this->_on_sound_thread, "on_sound_read", 10000, this, 9, &threadTask_sound, 1);
 }
-static long prev_time = 0;
-void CyberPi::_on_thread(void *p)
+void CyberPi::_on_lcd_thread(void *p)
 {
     while(true)
     {
-        long current_time = millis();
-        _audio.render();
-        if(current_time-prev_time>25)
-        {
-            prev_time = current_time;
-            gyro_read();
-        }
         if(xSemaphoreTake(_render_ready, 25)==pdTRUE)
         {
             lcd_draw(_framebuffer,128,128);
@@ -56,19 +57,11 @@ void CyberPi::_on_thread(void *p)
     }
 }
 
-#define JOYSTICK_UP_IO                      AW_P0_1                         
-#define JOYSTICK_DOWN_IO                    AW_P0_4
-#define JOYSTICK_RIGHT_IO                   AW_P0_2
-#define JOYSTICK_LEFT_IO                    AW_P0_0
-#define JOYSTICK_CENTER_IO                  AW_P0_3
-#define BUTTON_A_IO                         AW_P0_6
-#define BUTTON_B_IO                         AW_P0_5
-#define BUTTON_MENU_IO                      AW_P1_0
 
 void CyberPi::begin_gpio()
 {
-    aw_init();
     pinMode(33,INPUT);
+    aw_pinMode(AW_P1_3,AW_GPIO_MODE_OUTPUT);
     aw_pinMode(JOYSTICK_UP_IO,AW_GPIO_MODE_INPUT);
     aw_pinMode(JOYSTICK_DOWN_IO,AW_GPIO_MODE_INPUT);
     aw_pinMode(JOYSTICK_RIGHT_IO,AW_GPIO_MODE_INPUT);
@@ -78,10 +71,14 @@ void CyberPi::begin_gpio()
     aw_pinMode(BUTTON_B_IO,AW_GPIO_MODE_INPUT);
     aw_pinMode(BUTTON_MENU_IO,AW_GPIO_MODE_INPUT);
 }
+
 void CyberPi::begin_lcd()
 {
+    _framebuffer = (uint16_t*)this->malloc(128*128*2);
+    memset(_framebuffer,0,128*128*2);
     lcd_init();
 }
+
 void CyberPi::set_lcd_light(bool on)
 {
     if(on)
@@ -98,13 +95,15 @@ void CyberPi::clean_lcd()
 {
     memset(_framebuffer,0x0,128*128*2);
 }
-void CyberPi::set_lcd_pixel(uint8_t x,uint8_t y,uint16_t color)//uint16_t*buffer,uint16_t width,uint16_t height)
+
+void CyberPi::set_lcd_pixel(uint8_t x,uint8_t y,uint16_t color)
 {
     if(y>=0&&y<128&&x>=0&&x<128)
     {
         _framebuffer[y*128+x] = color;
     }
 }
+
 uint16_t CyberPi::color24_to_16(uint32_t rgb)
 {
     return color24to16(rgb);
@@ -218,19 +217,22 @@ float CyberPi::get_pitch()
 }
 void CyberPi::begin_sound()
 {
+    sound_enabled = true;
+    aw_digitalWrite(AW_P1_3,1);
     i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN ),
-    .sample_rate =  44100,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-    .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
-    .communication_format = I2S_COMM_FORMAT_I2S_MSB,
-    .intr_alloc_flags = 0,
-    .dma_buf_count = 16,
-    .dma_buf_len = 256,
-    }; 
-    i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-    i2s_set_dac_mode(I2S_DAC_CHANNEL_RIGHT_EN);
-    i2s_set_clk(I2S_NUM_0, 44100, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN ),
+        .sample_rate =  20000,
+        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+        .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+        .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+        .intr_alloc_flags = 0,
+        .dma_buf_count = 16,
+        .dma_buf_len = 256,
+        }; 
+        i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+        i2s_set_dac_mode(I2S_DAC_CHANNEL_RIGHT_EN); 
+        i2s_set_clk(I2S_NUM_0, 20000, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
+
     _audio.begin((AudioBack)&CyberPi::_render_audio); 
 }
 void CyberPi::set_pitch(uint8_t channel, uint8_t pitch,uint8_t time)
@@ -243,45 +245,74 @@ void CyberPi::set_instrument(uint8_t instrument)
 }
 void CyberPi::_render_audio(uint8_t *audio_buf,uint16_t audio_buf_len)
 {
-  size_t bytes_written;
-  i2s_write(I2S_NUM_0, audio_buf, audio_buf_len, &bytes_written, portMAX_DELAY);
-}
-mic_callback _mic_callback;
-void CyberPi::_on_mic_thread(void* parameter) {
-  size_t bytes_read = 0;
-  int mic_length = 1024;
-  int8_t *samples = (int8_t*)((CyberPi*)parameter)->malloc(1024);
-  while (true) 
-  {
-        i2s_read(I2S_NUM_1, samples, mic_length, &bytes_read, portMAX_DELAY);
-        int32_t dac_value = 0;
-        int32_t dac_value_addition = 0;
-        int32_t average_value = 0;
-        int16_t maximum_value = 0;
-        for(int i = 0; i < mic_length; i += 16)
+    if(sound_enabled)
+    {
+        size_t bytes_written;
+        i2s_write(I2S_NUM_0, audio_buf, audio_buf_len, &bytes_written, portMAX_DELAY);
+        if(_sound_callback)
         {
-            val2byte.byteVal[1] = samples[i + 1];
-            val2byte.byteVal[0] = samples[i + 0];
-            dac_value = val2byte.shortVal;
-            dac_value_addition = dac_value_addition + abs(dac_value);
-            if(abs(dac_value) > maximum_value)
-            {
-                maximum_value = abs(dac_value);
-            }
-        }
-        average_value = 16 * dac_value_addition / mic_length;
-        if(_mic_callback)
-        {
-            _mic_callback(samples,mic_length);
+            _sound_callback(audio_buf,audio_buf_len);
         }
     }
 }
+void CyberPi::_on_sound_thread(void*p)
+{
+    while(1)
+    {
+        if(sound_enabled)
+        {
+            _audio.render();
+        }
+    }
+}
+void CyberPi::_on_sensor_thread(void* p) {
+    size_t bytes_read = 0;
+    int mic_length = 1024;
+    uint8_t *samples = (uint8_t*)((CyberPi*)p)->malloc(1024);
+    while (true) 
+    {
+        long current_time = millis();
+        if(current_time-prev_time>25)
+        {
+            prev_time = current_time;
+            gyro_read();
+        }
+        if(microphone_enabled)
+        {
+            i2s_read(I2S_NUM_1, samples, mic_length, &bytes_read, portMAX_DELAY);
+            int32_t dac_value = 0;
+            int32_t dac_value_addition = 0;
+            int16_t maximum_value = 0;
+            for(int i = 0; i < mic_length; i += 16)
+            {
+                val2byte.byteVal[1] = samples[i + 1];
+                val2byte.byteVal[0] = samples[i + 0];
+                dac_value = val2byte.shortVal;
+                dac_value_addition = dac_value_addition + abs(dac_value);
+                if(abs(dac_value) > maximum_value)
+                {
+                    maximum_value = abs(dac_value);
+                }
+            }
+            _loudness = 16 * dac_value_addition / mic_length;
+            if(_mic_callback)
+            {
+                _mic_callback(samples,mic_length);
+            }
+        }
+    }
+}
+int CyberPi::get_loudness()
+{
+    return _loudness;
+}
 void CyberPi::begin_microphone ()
 {
+    microphone_enabled = true;
     _mic_callback = NULL;
     i2s_config_t i2s_config =
     {
-        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_TX),
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
         .sample_rate =  160000,
         .bits_per_sample = (i2s_bits_per_sample_t)16,
         .channel_format = (i2s_channel_fmt_t)I2S_CHANNEL_FMT_ONLY_RIGHT,
@@ -302,15 +333,17 @@ void CyberPi::begin_microphone ()
     i2s_set_pin(I2S_NUM_1, &pin_config);
     PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0_CLK_OUT1);
     es8218e_start();
-    TaskHandle_t threadTask;
-    xTaskCreatePinnedToCore(this->_on_mic_thread, "i2s_mic_read", 2048, this, 11, &threadTask, 1);
 }
 
-void CyberPi::on_microphone_data(void (*func)(int8_t*,int))
+void CyberPi::on_microphone_data(data_callback func)
 {
     _mic_callback = func;
 }
 
+void CyberPi::on_sound_data(data_callback func)
+{
+    _sound_callback = func;
+}
 uint8_t* CyberPi::malloc(uint32_t len)
 {
     if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM )==0)

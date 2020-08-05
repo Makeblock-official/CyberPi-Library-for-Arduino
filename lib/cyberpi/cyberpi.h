@@ -4,12 +4,19 @@
 #include <Arduino.h>
 extern "C"
 {
-// #include <esp32/himem.h>
-// #include <esp32/spiram.h>
 #include "esp_heap_caps.h"
 }
 #define MALLOC_SPI(a) (heap_caps_malloc((a),MALLOC_CAP_SPIRAM))
 #define MALLOC_INTERNAL(a) (heap_caps_malloc((a),MALLOC_CAP_DMA))
+
+#define JOYSTICK_UP_IO                      AW_P0_1                         
+#define JOYSTICK_DOWN_IO                    AW_P0_4
+#define JOYSTICK_RIGHT_IO                   AW_P0_2
+#define JOYSTICK_LEFT_IO                    AW_P0_0
+#define JOYSTICK_CENTER_IO                  AW_P0_3
+#define BUTTON_A_IO                         AW_P0_6
+#define BUTTON_B_IO                         AW_P0_5
+#define BUTTON_MENU_IO                      AW_P1_0
 
 union
 {
@@ -24,7 +31,7 @@ union
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
-typedef void (*mic_callback)(int8_t*,int);
+typedef void (*data_callback)(uint8_t*,int);
 class CyberPi
 {
     public:
@@ -64,6 +71,7 @@ class CyberPi
 
         void set_pitch(uint8_t channel, uint8_t pitch,uint8_t time);
         void set_instrument(uint8_t instrument);
+        int get_loudness();
         // void set_raw_sound();
 
         // void begin_ir();
@@ -71,7 +79,8 @@ class CyberPi
         // void sent_ir_data(uint8_t c);
 
         // void begin_microphone(on_record);
-        void on_microphone_data(void (*func)(int8_t*,int));
+        void on_microphone_data(data_callback func);
+        void on_sound_data(data_callback func);
         uint8_t* malloc(uint32_t len);
     private:
         long lastTime;
@@ -80,8 +89,9 @@ class CyberPi
         void begin_lcd();
         void begin_sound();
         void begin_microphone();
-        static void _on_mic_thread(void* parameter);
-        static void _on_thread(void *p);
+        static void _on_sound_thread(void*p);
+        static void _on_sensor_thread(void* parameter);
+        static void _on_lcd_thread(void *p);
         static void _render_audio(uint8_t *audio_buf,uint16_t audio_buf_len);
 };
 #endif
