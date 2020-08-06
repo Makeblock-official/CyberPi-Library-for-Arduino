@@ -1,8 +1,6 @@
 #include "cyberpi.h"
 
 CyberPi cyber;
-uint8_t samples[128];
-int idx = 0;
 
 void setup() {
     Serial.begin(112500);

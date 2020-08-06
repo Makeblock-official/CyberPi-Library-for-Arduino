@@ -23,7 +23,6 @@
 # Compiled Static libraries
 *.lai
 *.la
-*.a
 *.lib
 
 # Executables
@@ -32,5 +31,4 @@
 *.app
 .pio
 .vscode
-src/CMakeLists.txt
 CMakeLists.txt

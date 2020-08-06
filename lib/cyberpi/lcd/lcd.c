@@ -1,4 +1,372 @@
 #include "lcd.h"
+#include "GT30L24A3W.h"
+
+
+#define CONFIG_LIBRARY_SPI_NUM                (1)
+#define CONFIG_LIBRARY_SPI_CLOCK              (20000000)
+#define CONFIG_LIBRARY_MOSI_GPIO              (2)
+#define CONFIG_LIBRARY_MISO_GPIO              (26) 
+#define CONFIG_LIBRARY_CLK_GPIO               (4)
+
+#define CONFIG_LIBRARY_CS_GPIO                (27)
+#define CONFIG_LIBRARY_BCKL_ACTIVE_LEVEL      (1)  
+static spi_device_handle_t spi_wr_library;
+
+void library_spi_cmd(spi_device_handle_t spi, const uint8_t cmd)
+{
+    esp_err_t ret;
+    spi_transaction_t t = {
+        .length = 8,                    // Command is 8 bits
+        .tx_buffer = &cmd,              // The data is the cmd itself
+    };
+    ret = _lcd_spi_send(spi, &t);       // Transmit! 
+}
+
+uint8_t library_get_data(spi_device_handle_t spi, uint8_t *data_out, int len)
+{
+    esp_err_t ret;
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length= 8 * len;
+    t.rx_buffer = data_out;
+    ret = _lcd_spi_send(spi, &t);
+
+    // assert( ret == ESP_OK );
+
+    return 0;
+}
+unsigned char r_dat_bat(unsigned long  ReadAddr,unsigned int  NumByteToRead,unsigned char* pBuffer)
+{
+  unsigned long j = 0;
+  gpio_set_level(CONFIG_LIBRARY_CS_GPIO, 0);
+  
+  library_spi_cmd(spi_wr_library, 0x03);  //发送命令
+  library_spi_cmd(spi_wr_library, (unsigned char)(ReadAddr >> 16));  //发送地址
+  library_spi_cmd(spi_wr_library, (unsigned char)(ReadAddr >> 8));
+  library_spi_cmd(spi_wr_library, (unsigned char)(ReadAddr >> 0));
+
+  library_get_data(spi_wr_library, pBuffer, NumByteToRead);
+  gpio_set_level(CONFIG_LIBRARY_CS_GPIO, 1);
+  return 0;  
+}
+
+static uint32_t library_spi_init(spi_device_handle_t *spi_wr_dev_library, int dma_chan)
+{
+    spi_device_interface_config_t devcfg = {
+        // Use low speed to read ID.
+        .clock_speed_hz = 4 * 1000 * 1000,        //Clock out frequency
+        .mode = 0,                                //SPI mode 0
+        .spics_io_num = CONFIG_LIBRARY_CS_GPIO,     //CS pin
+        .queue_size = 7,                          //We want to be able to queue 7 transactions at a time
+    };
+
+    // Use high speed to write library
+    devcfg.clock_speed_hz = CONFIG_LIBRARY_SPI_CLOCK;
+    //devcfg.flags = SPI_DEVICE_HALFDUPLEX;
+    esp_err_t r1 = spi_bus_add_device((spi_host_device_t)CONFIG_LIBRARY_SPI_NUM, &devcfg, spi_wr_dev_library);
+
+    return ESP_OK;
+}
+static void mb_library_config_t()
+{
+  library_spi_init( &spi_wr_library, 1);
+}
+int get_utf8_data(uint32_t letter, uint8_t word_size, uint8_t *map, bool *elongate,uint8_t *width,uint8_t* height)
+{
+  uint8_t gb_msb,gb_lsb;
+  unsigned short Unicode = 0;
+  unsigned long GB_Code = 0x0000;
+  int use_word_size = 0;
+
+  if((letter >= 0x00) && ( letter <= 0x7F))      //ascii码
+  {
+    use_word_size = word_size;
+    ASCII_GetData(letter, use_word_size, map);
+    
+    if(use_word_size == ASCII_12_A ||
+       use_word_size == ASCII_16_A ||  
+       use_word_size == ASCII_24_B || 
+       use_word_size == ASCII_32_B)
+    {
+      *elongate = true;
+      if(width!=0)*width = map[1];
+    }
+
+  } 
+  //法语、德语、西班牙语、意大利、荷兰(拉丁文) 
+  else if((letter >= 0x0020 && letter <= 0x007F) || (letter >= 0x00A0 && letter <= 0x017F) || (letter >= 0x01A0 && letter <= 0x1CF) \
+   || (letter >= 0x01F0 && letter <= 0x01FF) || (letter >= 0x0210 && letter <= 0x021F) || (letter >= 0x1EA0 && letter <= 0x1EFF)) 
+  {
+    if(word_size <= ASCII_8X16)
+    {
+      LATIN_8X16_GetData(letter, map);
+      use_word_size = ASCII_8X16;
+    }
+    else if(word_size == ASCII_16_A)
+    {
+      LATIN_16_GetData(letter, map);
+      // *elongate = true;
+      use_word_size = ASCII_16_A;
+      // if(width!=0)*width = map[1];
+    }
+    else if(word_size >= ASCII_12X24_A)
+    {
+      LATIN_12X24_GetData(letter, map);
+      use_word_size = ASCII_12X24_A;
+    }
+  }
+  //俄语(西尔里文)
+  else if((letter >= 0x0400 && letter <= 0x045F) || (letter >= 0x0490 && letter <= 0x04FF)) 
+  {
+    if(word_size <= ASCII_8X16)
+    {
+      CYRILLIC_8X16_GetData(letter, map);
+      use_word_size = ASCII_8X16;
+    }
+    else if(word_size == ASCII_16_A)
+    {
+      CYRILLIC_16_GetData(letter, map);
+      // *elongate = true;
+      use_word_size = ASCII_16_A;
+      // if(width!=0)*width = map[1];
+    }
+    else if(word_size >= ASCII_12X24_A)
+    {
+      CYRILLIC_12X24_GetData(letter, map);
+      use_word_size = ASCII_12X24_A;
+    }
+  }
+  // 希腊文
+  else if(letter >= 0x0370 && letter <= 0x03CF)
+  {
+    if(word_size <= ASCII_8X16)
+    {
+      GREECE_8X16_GetData(letter, map);
+      use_word_size = ASCII_8X16;
+    }
+    else if(word_size == ASCII_16_A)
+    {
+      GREECE_16_GetData(letter, map);
+      // *elongate = true;
+      use_word_size = ASCII_16_A;
+      // if(width!=0)*width = map[1];
+    }
+    else if(word_size >= ASCII_12X24_A)
+    {
+      GREECE_12X24_GetData(letter, map);
+      use_word_size = ASCII_12X24_A;
+    }    
+  }
+  // 希伯来文
+  else if((letter >= 0x0590 && letter <= 0x05FF) || (letter >= 0xFB1D && letter <= 0xFB4F))
+  {
+    if(word_size <= ASCII_8X16)
+    {
+      HEBREW_8X16_GetData(letter, map);
+      use_word_size = ASCII_8X16;
+    }
+    else if(word_size >= ASCII_12X24_A)
+    {
+      HEBREW_12X24_GetData(letter, map);
+      use_word_size = ASCII_12X24_A;
+    }  
+  }
+  // 阿拉伯文
+  else if((letter >= 0x0600 && letter <= 0x06FF) || (letter >= 0xFB50 && letter <= 0xFBFF) || (letter >= 0xFE70 && letter <= 0xFEFF))
+  {
+    if(word_size <= ASCII_16_A)
+    {
+      ALB_16_GetData(letter, map);
+      use_word_size = ASCII_16_A;
+      // if(width!=0)*width = map[1];
+      // *elongate = true;
+    }
+    else
+    {
+      ALB_24_GetData(letter, map);
+      use_word_size = ASCII_24_B;
+      if(width!=0)*width = map[1];
+      *elongate = true;
+    }    
+  }
+  // 泰文
+  else if(letter >= 0x0E00 && letter <= 0x0E5F)
+  {
+    if(word_size <= ASCII_8X16)
+    {
+      THAILAND_8X16_GetData(letter, map);
+      use_word_size = ASCII_8X16;
+    }
+    else if(word_size >= ASCII_12X24_A)
+    {
+      THAILAND_16X24_GetData(letter, map);
+      use_word_size = ASCII_12X24_A;
+    }  
+  }
+  // 中、日、韩
+  else if((letter >= 0x00A0 && letter <= 0x0451) || (letter >= 0x2010  && letter <= 0x2642) || (letter >= 0x3000  && letter <= 0x33D5) \
+    || (letter >= 0x4E00  && letter <= 0x9FA5) || (letter >= 0xFE30  && letter <= 0xFE6B) || (letter >= 0xFF01  && letter <= 0xFF5E) \
+    || (letter >= 0xFFE0  && letter <= 0xFFE5) || (letter >= 0xF92C  && letter <= 0xFA29) || (letter >= 0xE816  && letter <= 0xE864) \
+    || (letter >= 0x2E81  && letter <= 0x2ECA) || (letter >= 0x4947  && letter <= 0x49b7) || (letter >= 0x4C77  && letter <= 0x4DAE) \
+    || (letter >= 0x3447  && letter <= 0x3CE0) || (letter >= 0x4056  && letter <= 0x478D) || (letter >= 0x0020 && letter < 0x07FF) || (letter >= 0x2000 && letter < 0x27FF) || (letter >= 0x3000 && letter < 0x30FF) \
+    || (letter >= 0x3200 && letter < 0x33FF) || (letter >= 0x4E00 && letter < 0x9FFF) || (letter >= 0xFE00 && letter < 0xFFFF) \
+    || (letter >= 0x2B05 && letter < 0x2B07) || (letter >= 0x00A1 && letter <= 0x0451) || (letter >= 0x2015 && letter <= 0x266D) || (letter >= 0x3000 && letter <= 0x30FF) \
+    || (letter >= 0xAC00 && letter <= 0xD79D) || (letter >= 0xF900 && letter <= 0xFFFF))
+  {
+    GB_Code = U2G(letter);
+    gb_msb = GB_Code >> 8;
+    gb_lsb = GB_Code & 0x00ff;
+
+    if((gb_lsb == 0x7F) || (gb_msb >= 0xA1 && gb_msb <= 0xA3 && gb_lsb >= 0xA1) || (gb_msb == 0xA6 && gb_lsb >= 0xA1) \
+      || (gb_msb == 0xA9 && gb_lsb >= 0xA1) || (gb_msb >= 0xB0 && gb_msb <= 0xF7 && gb_lsb >= 0xA1) || (gb_msb < 0xA1 && gb_msb >= 0x81 && gb_lsb >= 0x40) || (gb_msb >= 0xAA && gb_lsb < 0xA1))
+    {
+      if(word_size <= ASCII_12_A &&
+         ((gb_msb==0xA9UL && gb_lsb >=0xA4UL) ||
+         (gb_msb >=0xA1UL && gb_msb <= 0XA3UL && gb_lsb >=0xA1UL) ||
+         (gb_msb >=0xB0UL && gb_msb <= 0xF7UL && gb_lsb >=0xA1UL)))
+      {
+        gt_12_GetData(gb_msb, gb_lsb, map);
+        use_word_size = ASCII_12_A;
+        if(width!=0)*width = map[1];
+      }
+      else if(word_size == ASCII_16_A &&
+             ((gb_msb==0xA9UL && gb_lsb >=0xA4UL) ||
+             (gb_msb >=0xA1UL && gb_msb <= 0XA3UL && gb_lsb >=0xA1UL) ||
+             (gb_msb >=0xB0UL && gb_msb <= 0xF7UL && gb_lsb >=0xA1UL)))
+      {
+        gt_16_GetData(gb_msb, gb_lsb, map);
+        use_word_size = ASCII_16_A;
+        // if(width!=0)*width = map[1];
+      }
+      else// if(word_size <= ASCII_24_B)
+      {
+        GBK_24_GetData(gb_msb, gb_lsb, map);
+        use_word_size = ASCII_24_B;
+      }
+    }
+    else
+    {
+      GB_Code = U2J(letter);
+      gb_msb = GB_Code >> 8;
+      gb_lsb = GB_Code & 0x00ff;
+      if(((gb_msb <= 0x85 && gb_msb >= 0x01) && (gb_lsb <= 0x94 && gb_lsb >= 0x01)) || ((gb_msb <= 0x89 && gb_msb >= 0x88) && (gb_lsb <= 0x94 && gb_lsb >= 0x01)))
+      {
+        if(word_size <= ASCII_8X16)
+        {
+          JIS0208_16X16_GetData(gb_msb, gb_lsb, map);
+          use_word_size = ASCII_16_A;
+          // *elongate = true;
+        }
+        else if(word_size == ASCII_16_A)
+        {
+          JIS0208_16X16_GetData(gb_msb, gb_lsb, map);
+          use_word_size = ASCII_16_A;
+          // if(width!=0)*width = map[1];
+          // *elongate = true;
+        }
+        else if(word_size >= ASCII_24_B)
+        {
+          JIS0208_24X24_GetData(gb_msb, gb_lsb, map);
+          use_word_size = ASCII_24_B;
+        } 
+      }
+      else
+      {
+        GB_Code = U2K(letter);
+        gb_msb = GB_Code >> 8;
+        gb_lsb = GB_Code & 0x00ff;
+        if((gb_msb >= 0xA1 && gb_msb < 0xAD && gb_lsb >= 0xA1) || (gb_msb >= 0xB0 && gb_msb <= 0xC8 && gb_lsb >= 0xA1))
+        {
+          if(word_size <= ASCII_16_A)
+          {
+            KSC5601_F_16_GetData(gb_msb, gb_lsb, map);
+            use_word_size = ASCII_16_A;
+            // if(width!=0)*width = map[1];
+            // *elongate = true;
+          }
+          else if(word_size >= ASCII_24_B)
+          {
+            KSC5601_F_24_GetData(gb_msb, gb_lsb, map);
+            use_word_size = ASCII_24_B;
+          }   
+        }
+      }
+    } 
+  }
+  if(width!=0&&height!=0)
+  {
+    switch(use_word_size)
+    {
+      case ASCII_5X7:
+      {
+        *width = 5;
+        *height = 7;
+      }
+      break;
+      case ASCII_7X8:
+      {
+        *width = 7;
+        *height = 8;
+      }
+      break;
+      case ASCII_6X12:
+      {
+        *width = 6;
+        *height = 12;
+      }
+      break;
+      case ASCII_12_A:
+      {
+        *width = 12;
+        *height = 12;
+      }
+      break;
+      case ASCII_8X16:
+      {
+        *width = 8;
+        *height = 16;
+      }
+      break;
+      case ASCII_12X24_A:
+      {
+        *width = 12;
+        *height = 24;
+      }
+      break;
+      case ASCII_12X24_P:
+      {
+        *width = 12;
+        *height = 24;
+      }
+      break;
+      case ASCII_16X32:
+      {
+        *width = 16;
+        *height = 32;
+      }
+      break;
+      case ASCII_16_A:
+      {
+        *width = 16;
+        *height = 16;
+      }
+      break;
+      case ASCII_24_B:
+      {
+        *width = 24;
+        *height = 24;
+      }
+      break;
+      case ASCII_32_B:
+      {
+        *width = 32;
+        *height = 32;
+      }
+      break;
+    }
+  }
+  return use_word_size;
+}
 
 lcd_info_t lcd_info = 
 {
@@ -208,7 +576,21 @@ void lcd_init(void)
   }
 
   lcd_config(&lcd_info.lcd_conf);
+  
+  mb_library_config_t();
 
+  gpio_config_t io_conf;
+  io_conf.intr_type = GPIO_PIN_INTR_DISABLE;   
+  io_conf.mode = GPIO_MODE_OUTPUT;
+  io_conf.pin_bit_mask = ((uint64_t)1 << CONFIG_LIBRARY_CS_GPIO) ;// GPIO_OUTPUT_PIN_SEL;
+  io_conf.pull_down_en = 0;
+  io_conf.pull_up_en = 0;
+  gpio_config(&io_conf);
+
+  gpio_set_level(CONFIG_LIBRARY_CS_GPIO,0);
+  library_spi_cmd(spi_wr_library, 0x66);
+  library_spi_cmd(spi_wr_library, 0x99);
+  gpio_set_level(CONFIG_LIBRARY_CS_GPIO,1);
 }
 void lcd_write_command(uint8_t cmd, uint8_t *data, uint8_t len, uint8_t databytes);
 void lcd_rotate(uint16_t angle)

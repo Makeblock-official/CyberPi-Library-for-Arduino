@@ -90,7 +90,117 @@ void CyberPi::set_lcd_light(bool on)
         lcd_off();
     }
 }
-
+Bitmap* CyberPi::create_text(wchar_t*chars,uint16_t color,uint8_t font_size)
+{
+    Bitmap *bitmap = new Bitmap();
+    int cx=0,cy=0,x=0,y=0;
+    int i=0;
+    uint32_t c;
+    uint8_t font_width = font_size;
+    uint8_t font_height = font_size;
+    uint8_t font_max_height = font_size;
+    uint8_t *buf = (uint8_t*)MALLOC_SPI(400);
+    bool elongate = false;
+    uint8_t font = 10;
+    while((c = *(chars + i)) != 0) 
+    {
+        if(c == 0x08) 
+        { // Backspace
+            cx -= font_width;
+        } 
+        else if(c == 0x0A) 
+        {// New line
+            cx = 0;
+            cy += font_height;
+        }
+        else
+        {
+            get_utf8_data(c, c<256?6:font,buf,&elongate,&font_width,&font_height);
+            cx += font_width*font_max_height/font_height+0.5f;
+        }
+        i++;
+    }
+    bitmap->width = cx;
+    bitmap->height = cy+font_max_height+1;
+    bitmap->buffer = (uint16_t*)this->malloc(bitmap->width*bitmap->height*2);
+    memset(bitmap->buffer,0,bitmap->width*bitmap->height*2);
+    cx = 0;
+    cy = 0;
+    i = 0;
+    while((c = *(chars + i)) != 0) 
+    {
+        if(c == 0x08) 
+        {
+            cx -= font_width;
+        } 
+        else if(c == 0x0A) 
+        {
+            cx = 0;
+            cy += font_height;
+        } 
+        else 
+        {
+            get_utf8_data(c, c<256?6:font,buf,&elongate,&font_width,&font_height);
+            read_char(bitmap,cx, cy,font_size,font_max_height, buf+(elongate?2:0), font_width,font_height,elongate,color);
+            cx += font_width*font_max_height/font_height+0.5f;
+        }
+        i++;
+    }
+    free(buf);
+    return bitmap;
+}
+void CyberPi::read_char(Bitmap*bitmap,int x,int y,float w,float h,uint8_t* buffer, float font_width,float font_height,bool elongate,uint16_t color)
+{
+    if(buffer)
+    {
+        float width = font_width,height = font_height;
+        int widthBytes = (int)ceil((double)width / 8);
+        float scale = h/height;
+        if(scale==1)
+        {
+            for(int v=0; v<height; v++) 
+            {
+                for(int u=0; u<width; u++) 
+                {
+                    int b = u >> 3; 
+                    int bit = ~u & 7;
+                    if((buffer[widthBytes * v + b]>>bit)&1)
+                    {
+                        bitmap->buffer[x+u+(y+v)*bitmap->width] = color;
+                    }
+                }
+            }
+        }
+        else
+        {
+            uint8_t *buf = (uint8_t*)this->malloc(width*height);
+            memset(buf,0,width*height);
+            for(int v=0,hh=height; v<hh; v++) 
+            {
+                for(int u=0,ww=width; u<ww; u++) 
+                {
+                    int b = u >> 3; 
+                    int bit = ~u & 7;
+                    if((buffer[widthBytes * v + b]>>bit)&1)
+                    {
+                        buf[u+(v*ww)] = 1;
+                        bitmap->buffer[x+(int)(u*scale)+(y+(int)(v*scale))*bitmap->width] = color;
+                    }
+                }
+            }
+            for(int i=0,hh=height*scale+0.5f;i<hh;i++)
+            {
+                for(int j=0,ww=width*scale+0.5f,www=width;j<ww;j++)
+                {
+                    if(buf[(int)(i/scale)*www+(int)(j/scale)])
+                    {
+                        bitmap->buffer[x+j+(y+i)*bitmap->width] = color;
+                    }
+                }
+            }
+        }
+    }
+}
 void CyberPi::clean_lcd()
 {
     memset(_framebuffer,0x0,128*128*2);
@@ -104,6 +214,17 @@ void CyberPi::set_lcd_pixel(uint8_t x,uint8_t y,uint16_t color)
     }
 }
 
+void CyberPi::set_bitmap(uint8_t x,uint8_t y, Bitmap* bitmap)
+{
+    Serial.printf("%d,%d\n",bitmap->width,bitmap->height);
+    for(int i=0;i<bitmap->height;i++)
+    {
+        for(int j=0;j<bitmap->width;j++)
+        {
+            set_lcd_pixel(x+j,y+i,bitmap->buffer[i*bitmap->width+j]);
+        }
+    }
+}
 uint16_t CyberPi::color24_to_16(uint32_t rgb)
 {
     return color24to16(rgb);

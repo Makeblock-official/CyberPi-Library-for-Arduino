@@ -14,7 +14,7 @@ void loop()
 {
     if(idx<128)
     {
-        samples[idx] = cyber.get_loudness()>>4;
+        samples[idx] = cyber.get_loudness()>>5;
         idx++;
     }
     else
@@ -23,21 +23,20 @@ void loop()
         {
             samples[i] = samples[i+1];
         }
-        samples[idx-1] = cyber.get_loudness()>>4;
+        samples[idx-1] = cyber.get_loudness()>>5;
     }
     cyber.clean_lcd();
     for(int i=0;i<128;i++)
     {
-      int current = 128-samples[i];
       if(i==0)
-      cyber.set_lcd_pixel(i,current,0xffff);
+        cyber.set_lcd_pixel(i,127-samples[i],0xffff);
       else
       {
           int min_level = MIN(samples[i-1],samples[i]);
           int max_level = MAX(samples[i-1],samples[i]);
-          for(int j=min_level;j<max_level;j++)
+          for(int j=min_level;j<=max_level;j++)
           {
-            cyber.set_lcd_pixel(i,128-j,0xffff);
+            cyber.set_lcd_pixel(i,127-j,0xffff);
           }
       }
       

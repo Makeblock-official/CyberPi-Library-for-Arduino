@@ -279,4 +279,7 @@ void transmitDatas(uint8_t* data, int length);
 void transmitCmd(uint8_t cmd);
 void transmitDataRepat(uint16_t data, int32_t repeats);
 uint16_t color24to16(uint32_t color888);
+
+int get_utf8_data(uint32_t letter, uint8_t word_size, uint8_t *map, bool *elongate,uint8_t *width,uint8_t* height);
+
 #endif
