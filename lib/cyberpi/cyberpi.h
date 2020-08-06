@@ -35,9 +35,11 @@ typedef void (*data_callback)(uint8_t*,int);
 
 struct Bitmap
 {
-  uint8_t width;
-  uint8_t height;
-  uint16_t *buffer;
+    float x;
+    float y;
+    uint8_t width;
+    uint8_t height;
+    uint16_t *buffer;
 };
 
 class CyberPi
