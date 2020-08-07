@@ -1,4 +1,4 @@
-#include "cyberpi.h"
+#include <cyberpi.h>
 
 CyberPi cyber;
 void setup()
