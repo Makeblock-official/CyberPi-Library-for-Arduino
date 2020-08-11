@@ -19,7 +19,7 @@
 4. examples示例供参考
 
 
-```
+```c++
 #include "cyberpi.h"
 
 CyberPi cyber;
