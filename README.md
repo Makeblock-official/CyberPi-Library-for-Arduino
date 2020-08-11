@@ -5,7 +5,7 @@
 
 2. 复制"lib/cyberpi/platform.local.txt"文件至Arduino IDE的资源文件夹"/packages/esp32/hardware/esp32/1.0.4/"
 
-3. 安装拷贝lib/cyberpi至"文档/Arduino/libraries"
+3. 拷贝lib/cyberpi至"文档/Arduino/libraries"
 
 4. examples示例供参考
 
