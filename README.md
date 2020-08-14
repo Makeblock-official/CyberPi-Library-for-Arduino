@@ -1,22 +1,22 @@
 # cyberpi library for arduino
 
-### 使用Arduino IDE
-1. Arduino IDE的开发板管理器中安装ESP32环境
+### using Arduino IDE
+1. Search and install esp32 from Arduino IDE's Boards Manager
 
-2. 复制"lib/cyberpi/platform.local.txt"文件至Arduino IDE的资源文件夹"/packages/esp32/hardware/esp32/1.0.4/"
+2. copy "lib/cyberpi/platform.local.txt" to Arduino IDE's resources folder "/packages/esp32/hardware/esp32/1.0.4/"
 
-3. 拷贝lib/cyberpi至"文档/Arduino/libraries"
+3. copy "lib/cyberpi" to "Documents/Arduino/libraries"
 
-4. examples示例供参考
+4. "/examples" for reference only.
 
-### 使用VSCode+PlatformIO插件
-1. 本git仓库为完整platformio工程
+### using VSCode+PlatformIO
+1. the git repo is a full project with pio
  
-2. 拷贝lib/cyberpi至自己工程
+2. copy "lib/cyberpi" to your pio project
  
-3. 修改platform.ini中的upload_port串口号
+3. modify upload_port which is the connected cyberpi board in file "platform.ini"
 
-4. examples示例供参考
+4. "/examples" for reference only.
 
 
 ```c++
