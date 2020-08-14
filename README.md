@@ -14,7 +14,7 @@
  
 2. copy "lib/cyberpi" to your pio project
  
-3. modify upload_port which is the connected cyberpi board in file "platform.ini"
+3. modify "upload_port" which is the connected cyberpi board in file "platform.ini"
 
 4. "/examples" for reference only.
 
