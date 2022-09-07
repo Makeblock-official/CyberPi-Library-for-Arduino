@@ -1,5 +1,4 @@
 #include "cyberpi.h"
-#include "FreeRTOS.h"
 #include "driver/i2s.h"
 #include "driver/dac.h"
 extern "C" { 
