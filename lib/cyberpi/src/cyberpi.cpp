@@ -197,6 +197,7 @@ void CyberPi::read_char(Bitmap*bitmap,int x,int y,float w,float h,uint8_t* buffe
                     }
                 }
             }
+            free(buf);
         }
     }
 }
