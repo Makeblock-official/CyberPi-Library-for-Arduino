@@ -12,11 +12,6 @@ static float acc_y_static = 0.0;
 static float acc_z_static = 0.0;
 bool gyro_init()
 {
-    uint8_t chip_id = i2c_read( MPU6887_ADDR,  WHO_AM_I);
-    if(chip_id !=  MPU6887_DEVICE_ID)
-    {
-      return false;
-    }
     data_buf = (uint8_t*)malloc(14);
     acc_value = (int16_t*)malloc(6);
     gyro_value = (int16_t*)malloc(6);
