@@ -12,7 +12,7 @@ void i2c_init()
     gpio_config(&io_conf);
 
     int i2c_master_port = I2C_NUM_1;
-    i2c_config_t conf;
+    i2c_config_t conf = {0};
     conf.mode = I2C_MODE_MASTER;
     conf.sda_io_num = I2C_MASTER_SDA_IO;
     conf.sda_pullup_en = 0;
